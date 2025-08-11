@@ -20,6 +20,11 @@ ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1"
 async def root():
     return {"status": "ok", "service": "elevenlabs-mcp-server", "endpoints": ["/start-conversation", "/health"]}
 
+@app.post("/")
+async def root_post(request: dict):
+    """Handle POST requests to root - redirect to start-conversation"""
+    return await start_conversation(request)
+
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
