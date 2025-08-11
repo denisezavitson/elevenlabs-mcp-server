@@ -1,10 +1,42 @@
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import requests
+import os
+import json
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1"
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "service": "elevenlabs-mcp-server", "endpoints": ["/start-conversation", "/health"]}
+
+@app.post("/")
+async def root_post(request: dict):
+    """Handle POST requests to root - redirect to start-conversation"""
+    print(f"📨 Received POST to root: {json.dumps(request, indent=2)}")
+    return await start_conversation(request)
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
 @app.post("/start-conversation")
 async def start_conversation(request: dict):
     """Start a conversation with the configured agent"""
     print(f"🚀 start_conversation called with: {json.dumps(request, indent=2)}")
     
     agent_id = request.get("agent_id")
-    api_key = request.get("api_key")  # ← Base44 now sends this
+    api_key = request.get("api_key")
     
     print(f"🎯 Agent ID: {agent_id}")
     print(f"🔑 API Key from Base44: {'Yes' if api_key else 'No'}")
@@ -18,7 +50,7 @@ async def start_conversation(request: dict):
         raise HTTPException(status_code=400, detail="api_key is required")
     
     headers = {
-        "xi-api-key": api_key,  # ← Use the API key from Base44
+        "xi-api-key": api_key,
         "Content-Type": "application/json"
     }
     
