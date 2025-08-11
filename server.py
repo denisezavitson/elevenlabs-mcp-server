@@ -57,10 +57,10 @@ async def start_conversation(request: dict):
     try:
         print(f"📡 Calling ElevenLabs API for agent: {agent_id}")
         response = requests.post(
-            f"{ELEVENLABS_BASE_URL}/conversational-ai/agents/{agent_id}/conversations",
-            headers=headers,
-            timeout=30
-        )
+    f"{ELEVENLABS_BASE_URL}/convai/agents/{agent_id}/conversations",
+    headers=headers,
+    timeout=30
+)
         
         print(f"📈 ElevenLabs API response status: {response.status_code}")
         print(f"📄 ElevenLabs API response text: {response.text}")
