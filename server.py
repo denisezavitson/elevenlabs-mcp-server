@@ -21,8 +21,41 @@ async def root():
     return {"status": "ok", "service": "elevenlabs-mcp-server", "endpoints": ["/start-conversation", "/health", "/mcp/initialize", "/mcp/tools/list", "/mcp/tools/call"]}
 
 @app.post("/")
-async def root_post_simple():
-    return {"status": "mcp-ready", "protocol": "ready"}
+async def root_post(request: dict = None):
+    # Handle MCP protocol requests to root
+    if request and request.get("method") == "initialize":
+        return {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {
+                "tools": {},
+                "resources": {}
+            },
+            "serverInfo": {
+                "name": "Base44 ElevenLabs MCP Server",
+                "version": "1.0.0"
+            }
+        }
+    elif request and request.get("method") == "tools/list":
+        return {
+            "tools": [
+                {
+                    "name": "start_conversation",
+                    "description": "Start a conversation with an ElevenLabs agent",
+                    "inputSchema": {
+                        "type": "object",
+                        "properties": {
+                            "agent_id": {
+                                "type": "string",
+                                "description": "The ElevenLabs agent ID"
+                            }
+                        },
+                        "required": ["agent_id"]
+                    }
+                }
+            ]
+        }
+    else:
+        return {"status": "mcp-ready", "protocol": "ready", "available_methods": ["initialize", "tools/list"]}
 
 @app.get("/health")
 async def health():
