@@ -1,16 +1,15 @@
-# Dockerfile
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install uv package manager
-RUN pip install uv
+# Install required packages
+RUN pip install fastapi uvicorn requests
 
-# Install ElevenLabs MCP server
-RUN uv pip install --system elevenlabs-mcp
+# Copy our custom server
+COPY server.py .
 
 # Expose port
 EXPOSE 8080
 
-# Start the MCP server
-CMD ["python", "-m", "elevenlabs_mcp"]
+# Start our custom server
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
