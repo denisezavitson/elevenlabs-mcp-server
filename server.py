@@ -4,7 +4,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 import aiohttp
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -346,22 +346,29 @@ async def mcp_endpoint(request: Request):
             }
         }
 
-# Keep your original endpoint for backwards compatibility
+# FIXED LEGACY ENDPOINT FOR BASE44 APP
 @app.post("/start-conversation")
-async def start_conversation_legacy(request: dict):
-    """Legacy endpoint for direct API calls"""
-    agent_id = request.get("agent_id")
-    api_key = request.get("api_key")
-    
-    if not agent_id or not api_key:
-        return {"error": "agent_id and api_key required"}, 400
-    
-    headers = {
-        "xi-api-key": api_key,
-        "Content-Type": "application/json"
-    }
-    
+async def start_conversation_legacy(request: Request):
+    """Legacy endpoint for direct API calls from Base44 app"""
     try:
+        # Parse the request body
+        request_data = await request.json()
+        agent_id = request_data.get("agent_id")
+        api_key = request_data.get("api_key")
+        
+        logger.info(f"Legacy endpoint called with agent_id: {agent_id}")
+        
+        if not agent_id or not api_key:
+            return {
+                "error": "agent_id and api_key required",
+                "status": "error"
+            }
+        
+        headers = {
+            "xi-api-key": api_key,
+            "Content-Type": "application/json"
+        }
+        
         async with aiohttp.ClientSession() as session:
             async with session.post(
                 f"{ELEVENLABS_BASE_URL}/convai/agents/{agent_id}/conversations",
@@ -369,21 +376,36 @@ async def start_conversation_legacy(request: dict):
                 timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
                 
+                logger.info(f"ElevenLabs API response status: {response.status}")
+                
                 if response.status != 200:
                     error_text = await response.text()
-                    return {"error": f"ElevenLabs API error: {response.status} - {error_text}"}, response.status
+                    logger.error(f"ElevenLabs API error: {response.status} - {error_text}")
+                    return {
+                        "error": f"ElevenLabs API error: {response.status} - {error_text}",
+                        "status": "error"
+                    }
                 
                 conversation_data = await response.json()
+                logger.info(f"ElevenLabs conversation created: {conversation_data}")
                 
-                return {
+                # Return the format that Base44 expects
+                result = {
                     "conversation_id": conversation_data.get("conversation_id"),
                     "websocket_url": f"wss://api.elevenlabs.io/v1/convai/conversations/{conversation_data.get('conversation_id')}",
                     "status": "success",
                     "agent_id": agent_id
                 }
                 
+                logger.info(f"Returning to Base44: {result}")
+                return result
+                
     except Exception as e:
-        return {"error": f"Request error: {str(e)}"}, 500
+        logger.error(f"Exception in legacy endpoint: {str(e)}")
+        return {
+            "error": f"Request error: {str(e)}",
+            "status": "error"
+        }
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
