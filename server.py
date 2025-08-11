@@ -18,13 +18,12 @@ ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1"
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "service": "elevenlabs-mcp-server"}
+    return {"status": "ok", "service": "elevenlabs-mcp-server", "endpoints": ["/start-conversation", "/health"]}
 
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
 
-# NEW: Direct conversation endpoints for Base44
 @app.post("/start-conversation")
 async def start_conversation(request: dict):
     """Start a conversation with the configured agent"""
@@ -33,23 +32,29 @@ async def start_conversation(request: dict):
     if not agent_id:
         raise HTTPException(status_code=400, detail="agent_id is required")
     
+    if not ELEVENLABS_API_KEY:
+        raise HTTPException(status_code=500, detail="ELEVENLABS_API_KEY not configured")
+    
     headers = {
         "xi-api-key": ELEVENLABS_API_KEY,
         "Content-Type": "application/json"
     }
     
     try:
+        print(f"Starting conversation for agent: {agent_id}")
         response = requests.post(
             f"{ELEVENLABS_BASE_URL}/conversational-ai/agents/{agent_id}/conversations",
             headers=headers
         )
         
+        print(f"ElevenLabs API response status: {response.status_code}")
+        print(f"ElevenLabs API response: {response.text}")
+        
         if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+            raise HTTPException(status_code=response.status_code, detail=f"ElevenLabs API error: {response.text}")
         
         conversation_data = response.json()
         
-        # Return the conversation data including WebSocket URL
         return {
             "conversation_id": conversation_data.get("conversation_id"),
             "websocket_url": f"wss://api.elevenlabs.io/v1/conversational-ai/conversations/{conversation_data.get('conversation_id')}",
@@ -58,63 +63,8 @@ async def start_conversation(request: dict):
         }
         
     except requests.RequestException as e:
+        print(f"Request error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to start conversation: {str(e)}")
-
-@app.get("/conversation/{conversation_id}")
-async def get_conversation(conversation_id: str):
-    """Get conversation details"""
-    headers = {
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Content-Type": "application/json"
-    }
-    
-    try:
-        response = requests.get(
-            f"{ELEVENLABS_BASE_URL}/conversational-ai/conversations/{conversation_id}",
-            headers=headers
-        )
-        
-        if response.status_code != 200:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
-        
-        return response.json()
-        
-    except requests.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get conversation: {str(e)}")
-
-# Keep existing MCP protocol endpoints for ElevenLabs integration
-@app.post("/mcp/initialize")
-async def mcp_initialize():
-    return {
-        "protocolVersion": "2024-11-05",
-        "capabilities": {"tools": {}},
-        "serverInfo": {
-            "name": "Base44 ElevenLabs MCP Server",
-            "version": "1.0.0"
-        }
-    }
-
-@app.post("/mcp/tools/list")
-async def list_tools():
-    return {
-        "tools": [
-            {
-                "name": "start_conversation",
-                "description": "Start a conversation with an agent",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "agent_id": {"type": "string"}
-                    }
-                }
-            }
-        ]
-    }
-
-@app.post("/mcp/tools/call")
-async def call_tool(request: dict):
-    tool_name = request.get("name")
-    arguments = request.get("arguments", {})
-    
-    if tool_name == "start_conversation":
-        return await start_
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
