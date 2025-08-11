@@ -1,59 +1,24 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-import requests
-import os
-import json
-
-app = FastAPI()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
-ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1"
-
-# Debug: Print environment status
-print(f"🔧 Server starting...")
-print(f"🔑 API Key configured: {'Yes' if ELEVENLABS_API_KEY else 'No'}")
-print(f"🔑 API Key length: {len(ELEVENLABS_API_KEY) if ELEVENLABS_API_KEY else 0}")
-
-@app.get("/")
-async def root():
-    return {"status": "ok", "service": "elevenlabs-mcp-server", "endpoints": ["/start-conversation", "/health"]}
-
-@app.post("/")
-async def root_post(request: dict):
-    """Handle POST requests to root - redirect to start-conversation"""
-    print(f"📨 Received POST to root: {json.dumps(request, indent=2)}")
-    return await start_conversation(request)
-
-@app.get("/health")
-async def health():
-    return {"status": "healthy"}
-
 @app.post("/start-conversation")
 async def start_conversation(request: dict):
     """Start a conversation with the configured agent"""
     print(f"🚀 start_conversation called with: {json.dumps(request, indent=2)}")
     
     agent_id = request.get("agent_id")
+    api_key = request.get("api_key")  # ← Base44 now sends this
+    
     print(f"🎯 Agent ID: {agent_id}")
+    print(f"🔑 API Key from Base44: {'Yes' if api_key else 'No'}")
     
     if not agent_id:
         print("❌ No agent_id provided")
         raise HTTPException(status_code=400, detail="agent_id is required")
     
-    if not ELEVENLABS_API_KEY:
-        print("❌ No ELEVENLABS_API_KEY found")
-        raise HTTPException(status_code=500, detail="ELEVENLABS_API_KEY not configured")
+    if not api_key:
+        print("❌ No api_key provided")
+        raise HTTPException(status_code=400, detail="api_key is required")
     
     headers = {
-        "xi-api-key": ELEVENLABS_API_KEY,
+        "xi-api-key": api_key,  # ← Use the API key from Base44
         "Content-Type": "application/json"
     }
     
@@ -66,7 +31,6 @@ async def start_conversation(request: dict):
         )
         
         print(f"📈 ElevenLabs API response status: {response.status_code}")
-        print(f"📄 ElevenLabs API response headers: {dict(response.headers)}")
         print(f"📄 ElevenLabs API response text: {response.text}")
         
         if response.status_code != 200:
