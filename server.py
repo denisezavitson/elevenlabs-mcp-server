@@ -170,9 +170,10 @@ class MCPServer:
         
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{ELEVENLABS_BASE_URL}/convai/agents/{agent_id}/conversations",
+                async with session.get(
+                    f"{ELEVENLABS_BASE_URL}/convai/conversation/get_signed_url",
                     headers=headers,
+                    params={"agent_id": agent_id},
                     timeout=aiohttp.ClientTimeout(total=30)
                 ) as response:
                     
@@ -188,15 +189,16 @@ class MCPServer:
                             "isError": True
                         }
                     
-                    conversation_data = await response.json()
+                    signed_url_data = await response.json()
+                    websocket_url = signed_url_data.get("signed_url")
                     
                     return {
                         "content": [
                             {
                                 "type": "text",
                                 "text": json.dumps({
-                                    "conversation_id": conversation_data.get("conversation_id"),
-                                    "websocket_url": f"wss://api.elevenlabs.io/v1/convai/conversations/{conversation_data.get('conversation_id')}",
+                                    "conversation_id": None,
+                                    "websocket_url": websocket_url,
                                     "status": "success",
                                     "agent_id": agent_id
                                 }, indent=2)
@@ -369,10 +371,12 @@ async def start_conversation_legacy(request: Request):
             "Content-Type": "application/json"
         }
         
+        # Use the correct ElevenLabs endpoint for getting signed URL
         async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{ELEVENLABS_BASE_URL}/convai/agents/{agent_id}/conversations",
+            async with session.get(
+                f"{ELEVENLABS_BASE_URL}/convai/conversation/get_signed_url",
                 headers=headers,
+                params={"agent_id": agent_id},
                 timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
                 
@@ -386,13 +390,22 @@ async def start_conversation_legacy(request: Request):
                         "status": "error"
                     }
                 
-                conversation_data = await response.json()
-                logger.info(f"ElevenLabs conversation created: {conversation_data}")
+                signed_url_data = await response.json()
+                logger.info(f"ElevenLabs signed URL created: {signed_url_data}")
+                
+                # Extract the signed WebSocket URL
+                websocket_url = signed_url_data.get("signed_url")
+                
+                if not websocket_url:
+                    return {
+                        "error": "No signed_url returned from ElevenLabs",
+                        "status": "error"
+                    }
                 
                 # Return the format that Base44 expects
                 result = {
-                    "conversation_id": conversation_data.get("conversation_id"),
-                    "websocket_url": f"wss://api.elevenlabs.io/v1/convai/conversations/{conversation_data.get('conversation_id')}",
+                    "conversation_id": None,  # Not available until WebSocket connects
+                    "websocket_url": websocket_url,
                     "status": "success",
                     "agent_id": agent_id
                 }
