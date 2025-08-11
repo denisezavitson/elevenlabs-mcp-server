@@ -13,4 +13,4 @@ RUN uv pip install --system elevenlabs-mcp
 EXPOSE 8080
 
 # Start the MCP server
-CMD ["python", "-m", "elevenlabs_mcp", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["python", "-m", "elevenlabs_mcp"]
