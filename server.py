@@ -18,7 +18,7 @@ ELEVENLABS_BASE_URL = "https://api.elevenlabs.io/v1"
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "service": "elevenlabs-mcp-server", "endpoints": ["/start-conversation", "/health"]}
+    return {"status": "ok", "service": "elevenlabs-mcp-server", "endpoints": ["/start-conversation", "/health", "/mcp/initialize", "/mcp/tools/list", "/mcp/tools/call"]}
 
 @app.post("/")
 async def root_post_simple():
@@ -73,12 +73,28 @@ async def call_tool(request: dict):
         agent_id = arguments.get("agent_id")
         
         if not agent_id:
-            raise HTTPException(status_code=400, detail="agent_id is required")
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Error: agent_id is required"
+                    }
+                ],
+                "isError": True
+            }
         
-        # Use the API key from environment (since ElevenLabs will handle auth)
+        # Use the API key from environment
         api_key = os.getenv("ELEVENLABS_API_KEY")
         if not api_key:
-            raise HTTPException(status_code=500, detail="ELEVENLABS_API_KEY not configured")
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Error: ELEVENLABS_API_KEY not configured"
+                    }
+                ],
+                "isError": True
+            }
         
         headers = {
             "xi-api-key": api_key,
@@ -131,7 +147,15 @@ async def call_tool(request: dict):
                 "isError": True
             }
     
-    raise HTTPException(status_code=404, detail=f"Tool {tool_name} not found")
+    return {
+        "content": [
+            {
+                "type": "text",
+                "text": f"Error: Tool {tool_name} not found"
+            }
+        ],
+        "isError": True
+    }
 
 # Keep your existing endpoints for Base44 direct calls
 @app.post("/start-conversation")
